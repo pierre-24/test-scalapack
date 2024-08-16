@@ -6,7 +6,7 @@
 #include <mkl.h>
 #define LA_INT MKL_INT
 #else
-#define STDL_LA_INT int
+#define LA_INT int
 #endif
 #endif
 
