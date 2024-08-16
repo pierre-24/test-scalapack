@@ -399,3 +399,4 @@ TSWLatexianTemp*
 # Meson build dirs (in CLion & Github Actions)
 buildDir/
 _build/
+ENV

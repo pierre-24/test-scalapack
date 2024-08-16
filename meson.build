@@ -15,11 +15,23 @@ build_args = [
 
 # mkl
 
-project_dep += cc.find_library('mkl_core')
-project_dep += cc.find_library('mkl_intel_ilp64')
-project_dep += cc.find_library('mkl_sequential')
+mkl_libraries = [
+    'm',
+    'pthread',
+    'mkl_scalapack_ilp64',
+    'mkl_intel_ilp64',
+    'mkl_sequential',
+    'mkl_core',
+    'mkl_blacs_intelmpi_ilp64'
+]
 
+foreach name: mkl_libraries
+    project_dep += cc.find_library(name)
+endforeach
+
+build_args += '-DUSE_MKL'
 build_args += '-DMKL_ILP64'
+build_args += '-m64'
 
 # sources
 srcs = files(
