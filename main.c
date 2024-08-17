@@ -1,6 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define LA_INT Int
+#ifdef USE_LA_MKL
+#include <mkl_scalapack.h>
+#define Int MKL_INT
+#else
+#include <scalapack.h>
+#endif
 #include "cblacs.h"
 
 /**

@@ -16,16 +16,21 @@ build_args = [
 # linear algebra backend
 la_backend = get_option('la_backend')
 if la_backend == 'netlib'
-    netlib_libraries = [
-        'mpi',
-        'blas',
-        'lapack',
-        'scalapack'
-    ]
+    scalapack_dep = dependency('scalapack', required: false)
+    if scalapack_dep.found()
+        project_dep += scalapack_dep
+    else
+        netlib_libraries = [
+            'mpi',
+            'blas',
+            'lapack',
+            'scalapack'
+        ]
 
-    foreach name: netlib_libraries
-        project_dep += cc.find_library(name, required: true)
-    endforeach
+        foreach name: netlib_libraries
+            project_dep += cc.find_library(name, required: true)
+        endforeach
+    endif
 
     build_args += '-DUSE_LA_NETLIB'
 elif la_backend == 'mkl'
