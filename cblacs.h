@@ -2,7 +2,7 @@
 #define CBLACS_H
 
 #ifndef LA_INT
-#ifdef USE_MKL
+#ifdef USE_LA_MKL
 #include <mkl.h>
 #define LA_INT MKL_INT
 #else

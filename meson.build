@@ -13,25 +13,44 @@ build_args = [
   '-DPROJECT_VERSION="' + meson.project_version() + '"',
 ]
 
-# mkl
+# linear algebra backend
+la_backend = get_option('la_backend')
+if la_backend == 'netlib'
+    netlib_libraries = [
+        'mpi',
+        'blas',
+        'lapack',
+        'scalapack'
+    ]
 
-mkl_libraries = [
-    'm',
-    'pthread',
-    'mkl_scalapack_ilp64',
-    'mkl_intel_ilp64',
-    'mkl_sequential',
-    'mkl_core',
-    'mkl_blacs_intelmpi_ilp64'
-]
+    foreach name: netlib_libraries
+        project_dep += cc.find_library(name, required: true)
+    endforeach
 
-foreach name: mkl_libraries
-    project_dep += cc.find_library(name)
-endforeach
+    build_args += '-DUSE_LA_NETLIB'
+elif la_backend == 'mkl'
+    mkl_libraries = [
+        'm',
+        'mkl_scalapack_ilp64',
+        'mkl_intel_ilp64',
+        'mkl_intel_thread',
+        'mkl_core',
+        'mkl_blacs_intelmpi_ilp64',
+        'iomp5',
+    ]
 
-build_args += '-DUSE_MKL'
-build_args += '-DMKL_ILP64'
-build_args += '-m64'
+    foreach name: mkl_libraries
+        project_dep += cc.find_library(name, required: true)
+    endforeach
+
+    build_args += '-DUSE_LA_MKL'
+    build_args += '-DMKL_ILP64'
+elif la_backend == 'custom'
+    foreach lib: get_option('la_libraries')
+        project_dep += cc.find_library(lib, required : true)
+    endforeach
+    build_args += '-DUSE_LA_CUSTOM'
+endif
 
 # sources
 srcs = files(
