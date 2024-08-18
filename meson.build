@@ -57,17 +57,12 @@ elif la_backend == 'custom'
     build_args += '-DUSE_LA_CUSTOM'
 endif
 
-# sources
-srcs = files(
-    'main.c'
-)
-
 includes = include_directories('.')
 
-# executable
-stdlite_exe = executable(
-    meson.project_name(),
-    sources: srcs,
+# executables
+exe_hello = executable(
+    'hello',
+    sources: files('hello.c'),
     dependencies: project_dep,
     install: true,
     c_args : build_args,
