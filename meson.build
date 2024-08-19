@@ -67,3 +67,12 @@ exe_hello = executable(
     install: true,
     c_args : build_args,
 )
+
+
+exe_pdgemm = executable(
+    'pdgemm',
+    sources: files('pdgemm.c'),
+    dependencies: project_dep,
+    install: true,
+    c_args : build_args,
+)

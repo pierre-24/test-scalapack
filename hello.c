@@ -17,17 +17,15 @@
 int main(int argc, char* argv[]) {
     LA_INT iam, nprocs, ctx_sys, nrows, ncols, myrow, mycol, icaller, itscol, itsrow;
 
-    // initialize BLACS
+    // initialize BLACS &  get default context
     Cblacs_pinfo(&iam, &nprocs);
+    Cblacs_get(0, 0, &ctx_sys);
 
     // create a rectangular grid
     nrows = (LA_INT) sqrt((double) nprocs);
     ncols = nprocs / nrows;
     if(iam == 0)
         printf("0 :: rectangular grid with %lld procs is %lldx%lld\n", nprocs, nrows, ncols);
-
-    // get default context
-    Cblacs_get(0, 0, &ctx_sys);
 
     // create a grid and check where I am
     Cblacs_gridinit(&ctx_sys, "R", nrows, ncols);
