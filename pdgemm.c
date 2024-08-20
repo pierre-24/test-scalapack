@@ -51,9 +51,8 @@ int main(int argc, char* argv[]) {
     // local
     LA_INT  iam, loc_row, loc_col, loc_nrows, loc_ncols, loc_lld, info;
 
-    LA_INT desc_A[9], desc_B[9], desc_C[9], desc_glob_dest_A[9];
+    LA_INT desc_A[9], desc_B[9], desc_C[9];
     double *A, *B, *C, *work;
-    double *glob_dest_A = NULL;
     double norm_A, norm_B, norm_res;
 
     // seed
@@ -93,13 +92,14 @@ int main(int argc, char* argv[]) {
         }
 
     	// fill arrays locally
-        for(LA_INT loc_i=1; loc_i <= loc_nrows; loc_i++) { /* FORTRAN STARTS AT ONE !!!!!!!!! */
-            // translate local i to global i
+        for(LA_INT loc_j=1; loc_j <= loc_ncols; loc_j++) { /* FORTRAN STARTS AT ONE !!!!!!!!! */
+            // translate local j to global j
             // see https://netlib.org/scalapack/explore-html/d4/deb/indxl2g_8f_source.html
-            glob_i = indxl2g_(&loc_i, &blk_size, &loc_row, &I_ZERO, &glob_nrows) - 1;
-            for(LA_INT loc_j=1; loc_j <= loc_ncols; loc_j++) {
-                glob_j = indxl2g_(&loc_j, &blk_size, &loc_col, &I_ZERO, &glob_ncols) - 1;
-                // printf("%d :: %d %d → %d %d\n", iam, loc_i, loc_j, glob_i, glob_j);
+            glob_j = indxl2g_(&loc_j, &blk_size, &loc_col, &I_ZERO, &glob_ncols) - 1;
+            for(LA_INT loc_i=1; loc_i <= loc_nrows; loc_i++) {
+                glob_i = indxl2g_(&loc_i, &blk_size, &loc_row, &I_ZERO, &glob_nrows) - 1;
+
+                // set A[i,j]
                 A[(loc_j - 1) * loc_nrows + (loc_i - 1)] = ((N - glob_j - 1) == glob_i ? 1.0 : 0.0) - (double) (2 * glob_i * (N - glob_j - 1)) / ((double) M);
                 B[(loc_j - 1) * loc_nrows + (loc_i - 1)] = ((double) rand()) / INT32_MAX;
     		}
@@ -131,35 +131,15 @@ int main(int argc, char* argv[]) {
                 B, &I_ONE, &I_ONE, desc_B
                 );
 
-        // send B to process #0
-        desc_glob_dest_A[1] = -1;
+        // compute the norm of B
+        norm_res = pdlange_( "I", &N, &N, B, &I_ONE, &I_ONE, desc_B, work);
 
         if(iam == 0) {
-            glob_dest_A = calloc(N * N, sizeof(double ));
-            descinit_(desc_glob_dest_A, &N, &N, &N, &N, &I_ZERO, &I_ZERO, &ctx_0, &N, &info);
-        }
-
-        pdgemr2d(&N, &N, B, &I_ONE, &I_ONE, desc_B, glob_dest_A, &I_ONE, &I_ONE, desc_glob_dest_A, &ctx_sys);
-
-        if(iam == 0) { // received all parts of the matrix, just for the fun of it
-
-            /*printf("---\n");
-            for(LA_INT i=0; i < N; i++) {
-                for (LA_INT j = 0; j < N; ++j) {
-                    printf("% .4f ", glob_dest_A[i * N + j]);
-                }
-                printf("\n");
-            }*/
-
             // compute residual
-            double* work2 = calloc(N, sizeof(double));
-            norm_res = pdlange_( "I", &N, &N, glob_dest_A, &I_ONE, &I_ONE, desc_glob_dest_A, work2);
             double eps = pdlamch_(&ctx_0, "e");
             double residual = norm_res / (2 * norm_A * norm_B * eps);
 
             printf("%d :: r = %e\n", iam, residual);
-            free(glob_dest_A);
-            free(work2);
         }
 
     	// free
