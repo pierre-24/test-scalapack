@@ -83,3 +83,11 @@ exe_layout = executable(
     install: true,
     c_args : build_args,
 )
+
+exe_layout = executable(
+    'pdsyev',
+    sources: files('pdsyev.c'),
+    dependencies: project_dep,
+    install: true,
+    c_args : build_args,
+)

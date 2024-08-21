@@ -5,11 +5,13 @@
  *
  * In practice,
  *
- * - `N = floor(sqrt(P)) * BLK_SIZE * BLK_PER_PROC`, where `P` is the number of processors, `BLK_SIZE` is the block size and `BLK_PER_PROC` is the number of bloc per bloc (> 1).
+ * - `N = floor(sqrt(P)) * BLK_SIZE * BLK_PER_PROC`,
+ *
+ *    where `P` is the number of processors, `BLK_SIZE` is the block size and `BLK_PER_PROC` is the number of bloc per proc (> 1).
  *
  * - `A` is an orthonormal matrix (similar to a Householder transformation) defined by:
  *
- *   `A[i,j] = (N-i-1 == j ? 1:0) - 2 * (N-i-1) * j / M`, where `M = N * (N-1) * (2 * N - 1) / 6`.
+ *   `A[i,j] = (N-j-1 == i ? 1:0) - 2 * (N-j-1) * i / M`, where `M = N * (N-1) * (2 * N - 1) / 6`.
  *
  *   Therefore `inv(A) = tr(A)`, where `tr(A)` is the transpose of `A`.
  *
@@ -47,11 +49,11 @@ int main(int argc, char* argv[]) {
     // constant
     LA_INT N, blk_size = BLK_SIZE, M;
     // global
-    LA_INT nprocs, ctx_sys, ctx_0, glob_nrows, glob_ncols, glob_i, glob_j;
+    LA_INT nprocs, ctx_sys, glob_nrows, glob_ncols, glob_i, glob_j;
     // local
     LA_INT  iam, loc_row, loc_col, loc_nrows, loc_ncols, loc_lld, info;
 
-    LA_INT desc_A[9], desc_B[9], desc_C[9];
+    LA_INT desc_A[9];
     double *A, *B, *C, *work;
     double norm_A, norm_B, norm_res;
 
@@ -70,7 +72,6 @@ int main(int argc, char* argv[]) {
 
     Cblacs_gridinit(&ctx_sys, "R", glob_nrows, glob_ncols);
     Cblacs_gridinfo(ctx_sys, &glob_nrows, &glob_ncols, &loc_row, &loc_col);
-    Cblacs_gridinit(&ctx_0, "R", 1, 1);
 
     if(iam == 0)
         printf("%d :: grid is %dx%d, matrix is %dx%d\n", iam, glob_nrows, glob_ncols, N, N);
@@ -106,41 +107,37 @@ int main(int argc, char* argv[]) {
     	}
 
     	// create descriptor for A, B and C
+        // note: no need to use different descriptor if matrices share the same size and are distributed similarly
     	descinit_(desc_A, &N, &N, &blk_size, &blk_size, &I_ZERO, &I_ZERO, &ctx_sys, &loc_lld, &info);
-    	descinit_(desc_B, &N, &N, &blk_size, &blk_size, &I_ZERO, &I_ZERO, &ctx_sys, &loc_lld, &info);
-    	descinit_(desc_C, &N, &N, &blk_size, &blk_size, &I_ZERO, &I_ZERO, &ctx_sys, &loc_lld, &info);
 
         // compute norm of A and B
         // see https://www.ibm.com/docs/en/pessl/5.5?topic=subroutines-pdlange-pzlange-general-matrix-norm
         work = (double*) calloc(loc_nrows, sizeof(double));
         norm_A = pdlange_( "I", &N, &N, A, &I_ONE, &I_ONE, desc_A, work);
-        norm_B = pdlange_( "I", &N, &N, B, &I_ONE, &I_ONE, desc_B, work);
+        norm_B = pdlange_( "I", &N, &N, B, &I_ONE, &I_ONE, desc_A, work);
 
         // compute C = A * B
         // see https://www.ibm.com/docs/en/pessl/5.5?topic=lps-pdgemm-pzgemm-matrix-matrix-product-general-matrix-its-transpose-its-conjugate-transpose
         pdgemm_("N", "N", &N, &N, &N,
                 &D_ONE, A, &I_ONE, &I_ONE, desc_A,
-                B, &I_ONE, &I_ONE, desc_B,
-                &D_ZERO, C, &I_ONE, &I_ONE, desc_C
+                B, &I_ONE, &I_ONE, desc_A,
+                &D_ZERO, C, &I_ONE, &I_ONE, desc_A
         );
 
         // compute B = tr(A) * C - B
         pdgemm_("T", "N", &N, &N, &N,
                 &D_ONE, A, &I_ONE, &I_ONE, desc_A,
-                C, &I_ONE, &I_ONE, desc_C, &D_M_ONE,
-                B, &I_ONE, &I_ONE, desc_B
+                C, &I_ONE, &I_ONE, desc_A, &D_M_ONE,
+                B, &I_ONE, &I_ONE, desc_A
                 );
 
-        // compute the norm of B
-        norm_res = pdlange_( "I", &N, &N, B, &I_ONE, &I_ONE, desc_B, work);
+        // compute the norm of B & residual
+        norm_res = pdlange_( "I", &N, &N, B, &I_ONE, &I_ONE, desc_A, work);
+        double eps = pdlamch_(&ctx_sys, "e");
+        double residual = norm_res / (2 * norm_A * norm_B * eps);
 
-        if(iam == 0) {
-            // compute residual
-            double eps = pdlamch_(&ctx_0, "e");
-            double residual = norm_res / (2 * norm_A * norm_B * eps);
-
+        if(iam == 0)
             printf("%d :: r = %e\n", iam, residual);
-        }
 
     	// free
     	free(A);
