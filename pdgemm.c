@@ -113,8 +113,8 @@ int main(int argc, char* argv[]) {
         // compute norm of A and B
         // see https://www.ibm.com/docs/en/pessl/5.5?topic=subroutines-pdlange-pzlange-general-matrix-norm
         work = (double*) calloc(loc_nrows, sizeof(double));
-        norm_A = pdlange_( "I", &N, &N, A, &I_ONE, &I_ONE, desc_A, work);
-        norm_B = pdlange_( "I", &N, &N, B, &I_ONE, &I_ONE, desc_A, work);
+        norm_A = pdlange_( "F", &N, &N, A, &I_ONE, &I_ONE, desc_A, work);
+        norm_B = pdlange_( "F", &N, &N, B, &I_ONE, &I_ONE, desc_A, work);
 
         // compute C = A * B
         // see https://www.ibm.com/docs/en/pessl/5.5?topic=lps-pdgemm-pzgemm-matrix-matrix-product-general-matrix-its-transpose-its-conjugate-transpose
@@ -132,12 +132,12 @@ int main(int argc, char* argv[]) {
                 );
 
         // compute the norm of B & residual
-        norm_res = pdlange_( "I", &N, &N, B, &I_ONE, &I_ONE, desc_A, work);
+        norm_res = pdlange_( "F", &N, &N, B, &I_ONE, &I_ONE, desc_A, work);
         double eps = pdlamch_(&ctx_sys, "e");
         double residual = norm_res / (2 * norm_A * norm_B * eps);
 
         if(iam == 0)
-            printf("%d :: r = %e\n", iam, residual);
+            printf("%d :: r = %f\n", iam, residual);
 
     	// free
     	free(A);

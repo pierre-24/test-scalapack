@@ -30,7 +30,7 @@
 #define BLK_SIZE 32
 #define BLK_PER_PROC 2
 
-LA_INT I_ZERO = 0, I_ONE = 1, I_M_ONE = -1, I_TWO = 2;
+LA_INT I_ZERO = 0, I_ONE = 1, I_M_ONE = -1;
 double D_ONE = 1.0, D_ZERO = 0.0, D_M_ONE = -1.0;
 
 extern LA_INT indxl2g_(LA_INT* INDXGLOB, LA_INT* NB, LA_INT* IPROC, LA_INT* ISRCPROC, LA_INT* NPROCS);
@@ -90,8 +90,10 @@ int main(int argc, char* argv[]) {
                 glob_i = indxl2g_(&loc_i, &blk_size, &loc_row, &I_ZERO, &glob_nrows) - 1;
 
                 // set A[i,j]
-                A[(loc_j - 1) * loc_nrows + (loc_i - 1)] = 1. / (1. + .5 * fabs(glob_i - glob_j));
-                Ap[(loc_j - 1) * loc_nrows + (loc_i - 1)] = A[(loc_j - 1) * loc_nrows + (loc_i - 1)];
+                if(glob_i <= glob_j) {
+                    A[(loc_j - 1) * loc_nrows + (loc_i - 1)] = 1. / (1. + .5 * fabs(glob_i - glob_j));
+                    Ap[(loc_j - 1) * loc_nrows + (loc_i - 1)] = A[(loc_j - 1) * loc_nrows + (loc_i - 1)];
+                }
             }
         }
 
@@ -121,7 +123,7 @@ int main(int argc, char* argv[]) {
         for(LA_INT i = 1; i <= N; i++) { // FORTRAN, starts at one
             // compute `r = A * x_i`
             // according to the doc of pdsyev, eigenvectors are located in columns
-            pdgemv_("N", &N, &N,
+            pdsymv_("U", &N,
                     &D_ONE, A, &I_ONE, &I_ONE, desc_A,
                     X, &I_ONE, &i, desc_A, &I_ONE,
                     &D_ZERO, r, &I_ONE, &I_ONE, desc_r, &I_ONE
@@ -135,13 +137,13 @@ int main(int argc, char* argv[]) {
                     );
 
             // compute norm of x_i and r
-            norm_X = pdlange_( "1", &N, &i, X, &I_ONE, &I_ONE, desc_A, work);
-            norm_res = pdlange_( "1", &N, &I_ONE, r, &I_ONE, &I_ONE, desc_r, work);
+            norm_X = pdlange_( "F", &N, &I_ONE, X, &I_ONE, &i, desc_A, work);
+            norm_res = pdlange_( "F", &N, &I_ONE, r, &I_ONE, &I_ONE, desc_r, work);
             double eps = pdlamch_(&ctx_sys, "e");
-            double residual = norm_res / (2 * norm_A * norm_X * eps); // might not be the correct residual :(
+            double residual = norm_res / (norm_X * norm_A * eps); // might not be the correct residual :(
 
             if(iam == 0)
-                printf("%d :: eigenvalue #%d is %f, residual is %e\n", iam, i, w[i - 1], residual);
+                printf("%d :: eigenvalue #%d is %f with residual is %f\n", iam, i, w[i - 1], residual);
         }
 
         // free
