@@ -140,7 +140,7 @@ int main(int argc, char* argv[]) {
             norm_X = pdlange_( "F", &N, &I_ONE, X, &I_ONE, &i, desc_A, work);
             norm_res = pdlange_( "F", &N, &I_ONE, r, &I_ONE, &I_ONE, desc_r, work);
             double eps = pdlamch_(&ctx_sys, "e");
-            double residual = norm_res / (norm_X * norm_A * eps); // might not be the correct residual :(
+            double residual = norm_res / (2 * fabs(w[i - 1]) * norm_X * eps); // might not be the correct residual :(
 
             if(iam == 0)
                 printf("%d :: eigenvalue #%d is %f with residual is %f\n", iam, i, w[i - 1], residual);
