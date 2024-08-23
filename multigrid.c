@@ -1,12 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define LA_INT Int
-#ifdef USE_LA_MKL
-#include <mkl.h>
-#define Int MKL_INT
-#endif
-#include "cblacs.h"
+#include <mkl_blacs.h>
 
 /**
  * Find grid params, but ensure that all processors are used
@@ -15,8 +10,8 @@
  * @param[out] nrows
  * @param[out] ncols
  */
-void find_grid_params_all(LA_INT nprocs, LA_INT* nrows, LA_INT* ncols) {
-    for(LA_INT i = 1; i*i <= nprocs; i++) {
+void find_grid_params_all(MKL_INT nprocs, MKL_INT* nrows, MKL_INT* ncols) {
+    for(MKL_INT i = 1; i*i <= nprocs; i++) {
         if(nprocs % i == 0) {
             *nrows = nprocs / i;
             *ncols = i;
@@ -33,7 +28,7 @@ void find_grid_params_all(LA_INT nprocs, LA_INT* nrows, LA_INT* ncols) {
  * @param[out] nrows
  * @param[out] ncols
  */
-void find_grid_params_rectangular(LA_INT nprocs, LA_INT tol, LA_INT* nrows, LA_INT* ncols) {
+void find_grid_params_rectangular(MKL_INT nprocs, MKL_INT tol, MKL_INT* nrows, MKL_INT* ncols) {
     *nrows = *ncols = 1;
 
     // find square
@@ -48,23 +43,26 @@ void find_grid_params_rectangular(LA_INT nprocs, LA_INT tol, LA_INT* nrows, LA_I
     }
 }
 
+MKL_INT I_ZERO = 0, I_ONE = 1;
+
 int main(int argc, char* argv[]) {
-    LA_INT iam, nprocs, ctx_sys, ctx_all, ctx_rect, nrows, ncols, myrow, mycol;
+    MKL_INT iam, nprocs, ctx_sys, ctx_all, ctx_rect, nrows, ncols, myrow, mycol;
 
     // initialize MPI (via BLACS)
-    Cblacs_pinfo(&iam, &nprocs);
+    blacs_pinfo(&iam, &nprocs);
 
     // get default context (most probably zero)
-    Cblacs_get(0, 0, &ctx_sys);
+    blacs_get(&I_ZERO, &I_ZERO, &ctx_sys);
 
     // set a grid for all processes
     // https://www.netlib.org/scalapack/slug/node71.html#secblacscontext
+    // NOTE: to use multiple grid, ctx_sys should not directly be set.
     ctx_all = ctx_sys;
     find_grid_params_all(nprocs, &nrows, &ncols);
     if(iam == 0) {
         printf("0 :: grid with %lld procs is %lldx%lld\n", nprocs, nrows, ncols);
     }
-    Cblacs_gridinit(&ctx_all, "R", nrows, ncols);
+    blacs_gridinit(&ctx_all, "R", &nrows, &ncols);
 
     // set a rectangular grid
     ctx_rect = ctx_sys;
@@ -72,24 +70,24 @@ int main(int argc, char* argv[]) {
     if(iam == 0) {
         printf("0 :: rectangular grid with %lld procs is %lldx%lld\n", nprocs, nrows, ncols);
     }
-    Cblacs_gridinit(&ctx_rect, "R", nrows, ncols);
+    blacs_gridinit(&ctx_rect, "R", &nrows, &ncols);
 
-    Cblacs_gridinfo(ctx_all, &nrows, &ncols, &myrow, &mycol); // note: the number of cols & rows is an output as well!
+    blacs_gridinfo(&ctx_all, &nrows, &ncols, &myrow, &mycol); // note: the number of cols & rows is an output as well!
     printf("%lld :: On context %lld, I'm (%lld, %lld)\n", iam, ctx_all, myrow, mycol);
 
     if(ctx_rect >= 0) {
-        Cblacs_gridinfo(ctx_rect, &nrows, &ncols, &myrow, &mycol);
+        blacs_gridinfo(&ctx_rect, &nrows, &ncols, &myrow, &mycol);
         printf("%lld :: On context %lld, I'm (%lld, %lld)\n", iam, ctx_rect, myrow, mycol);
     }
 
     // exit grids
-    Cblacs_gridexit(ctx_all);
+    blacs_gridexit(&ctx_all);
 
     if(ctx_rect >= 0)
-        Cblacs_gridexit(ctx_rect);
+        blacs_gridexit(&ctx_rect);
 
     // finalize MPI (via BLACS)
-    Cblacs_exit(0);
+    blacs_exit(&I_ZERO);
 
     return EXIT_SUCCESS;
 }

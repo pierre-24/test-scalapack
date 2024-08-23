@@ -16,48 +16,42 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define Int LA_INT
-#ifdef USE_LA_MKL
-#include <mkl.h>
+#include <mkl_blacs.h>
 #include <mkl_pblas.h>
 #include <mkl_scalapack.h>
-#define LA_INT MKL_INT
-#else
-#define LA_INT LA_INT
-#endif
-#include "cblacs.h"
+
 
 #define BLK_SIZE 32
 #define BLK_PER_PROC 2
 
-LA_INT I_ZERO = 0, I_ONE = 1, I_M_ONE = -1;
+MKL_INT I_ZERO = 0, I_ONE = 1, I_M_ONE = -1;
 double D_ONE = 1.0, D_ZERO = 0.0, D_M_ONE = -1.0;
 
-extern LA_INT indxl2g_(LA_INT* INDXGLOB, LA_INT* NB, LA_INT* IPROC, LA_INT* ISRCPROC, LA_INT* NPROCS);
+extern MKL_INT indxl2g_(MKL_INT* INDXGLOB, MKL_INT* NB, MKL_INT* IPROC, MKL_INT* ISRCPROC, MKL_INT* NPROCS);
 
 int main(int argc, char* argv[]) {
     // constant
-    LA_INT N, blk_size = BLK_SIZE, lwork;
+    MKL_INT N, blk_size = BLK_SIZE, lwork;
     // global
-    LA_INT nprocs, ctx_sys, glob_nrows, glob_ncols, glob_i, glob_j;
+    MKL_INT nprocs, ctx_sys, glob_nrows, glob_ncols, glob_i, glob_j;
     // local
-    LA_INT  iam, loc_row, loc_col, loc_nrows, loc_ncols, loc_lld, info;
+    MKL_INT  iam, loc_row, loc_col, loc_nrows, loc_ncols, loc_lld, info;
 
-    LA_INT desc_A[9], desc_r[9];
+    MKL_INT desc_A[9], desc_r[9];
     double *A, *Ap, *X, *w, *r, *work;
     double norm_res, norm_A, norm_X;
 
     // initialize BLACS & system context
-    Cblacs_pinfo(&iam, &nprocs);
-    Cblacs_get(0, 0, &ctx_sys);
+    blacs_pinfo(&iam, &nprocs);
+    blacs_get(&I_ZERO, &I_ZERO, &ctx_sys);
 
     // create the grid
-    glob_nrows = (LA_INT) sqrt((double) nprocs);
+    glob_nrows = (MKL_INT) sqrt((double) nprocs);
     glob_ncols = nprocs / glob_nrows;
     N = glob_nrows * BLK_SIZE * BLK_PER_PROC;
 
-    Cblacs_gridinit(&ctx_sys, "R", glob_nrows, glob_ncols);
-    Cblacs_gridinfo(ctx_sys, &glob_nrows, &glob_ncols, &loc_row, &loc_col);
+    blacs_gridinit(&ctx_sys, "R", &glob_nrows, &glob_ncols);
+    blacs_gridinfo(&ctx_sys, &glob_nrows, &glob_ncols, &loc_row, &loc_col);
 
     if(iam == 0)
         printf("%d :: grid is %dx%d, matrix is %dx%d\n", iam, glob_nrows, glob_ncols, N, N);
@@ -82,11 +76,11 @@ int main(int argc, char* argv[]) {
         }
 
         // fill array locally
-        for(LA_INT loc_j=1; loc_j <= loc_ncols; loc_j++) { /* FORTRAN STARTS AT ONE !!!!!!!!! */
+        for(MKL_INT loc_j=1; loc_j <= loc_ncols; loc_j++) { /* FORTRAN STARTS AT ONE !!!!!!!!! */
             // translate local j to global j
             // see https://netlib.org/scalapack/explore-html/d4/deb/indxl2g_8f_source.html
             glob_j = indxl2g_(&loc_j, &blk_size, &loc_col, &I_ZERO, &glob_ncols) - 1;
-            for(LA_INT loc_i=1; loc_i <= loc_nrows; loc_i++) {
+            for(MKL_INT loc_i=1; loc_i <= loc_nrows; loc_i++) {
                 glob_i = indxl2g_(&loc_i, &blk_size, &loc_row, &I_ZERO, &glob_nrows) - 1;
 
                 // set A[i,j]
@@ -104,13 +98,13 @@ int main(int argc, char* argv[]) {
         // request lwork
         // the (convoluted) formula is at https://www.ibm.com/docs/en/pessl/5.3.0?topic=easva-pdsyev-pzheev-all-eigenvalues-optionally-eigenvectors-real-symmetric-complex-hermitian-matrix
         double tmpw;
-        pdsyev_("V", "U", &N, Ap, &I_ONE, &I_ONE, desc_A, w, X, &I_ONE, &I_ONE, desc_A, &tmpw, &I_M_ONE, &info);
-        lwork = (LA_INT) tmpw;
+        pdsyev("V", "U", &N, Ap, &I_ONE, &I_ONE, desc_A, w, X, &I_ONE, &I_ONE, desc_A, &tmpw, &I_M_ONE, &info);
+        lwork = (MKL_INT) tmpw;
 
         // compute the eigenvalues and vectors
         // NOTE: like dsyev(), the content of A is irremediably destroyed in the process :(
         work = calloc(lwork, sizeof(double ));
-        pdsyev_("V", "U", &N, Ap, &I_ONE, &I_ONE, desc_A, w, X, &I_ONE, &I_ONE, desc_A, work, &lwork, &info);
+        pdsyev("V", "U", &N, Ap, &I_ONE, &I_ONE, desc_A, w, X, &I_ONE, &I_ONE, desc_A, work, &lwork, &info);
 
         if(info != 0) {
             printf("%d :: error: info is %d\n", iam, info);
@@ -120,7 +114,7 @@ int main(int argc, char* argv[]) {
         // compute norm of A
         norm_A = pdlange_( "I", &N, &N, A, &I_ONE, &I_ONE, desc_A, work);
 
-        for(LA_INT i = 1; i <= N; i++) { // FORTRAN, starts at one
+        for(MKL_INT i = 1; i <= N; i++) { // FORTRAN, starts at one
             // compute `r = A * x_i`
             // according to the doc of pdsyev, eigenvectors are located in columns
             pdsymv_("U", &N,
@@ -156,6 +150,6 @@ int main(int argc, char* argv[]) {
         printf("%d :: i'm out!\n", iam);
 
     // finalize BLACS
-    Cblacs_exit(0);
+    blacs_exit(&I_ZERO);
     return EXIT_SUCCESS;
 }

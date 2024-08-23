@@ -11,8 +11,6 @@ meson compile _build
 mpirun -np 4 _build/test-scalapack
 ```
 
-Note: `-Dla_backend=netlib` not tested.
-
 ## Notes
 
 + Header from <https://github.com/pierre-24/cblacs-header>.

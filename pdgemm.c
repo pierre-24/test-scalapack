@@ -25,35 +25,29 @@
 #include <math.h>
 #include <string.h>
 #include <time.h>
+#include <limits.h>
 
-#define Int LA_INT
-#ifdef USE_LA_MKL
-#include <mkl.h>
+#include <mkl_blacs.h>
 #include <mkl_pblas.h>
 #include <mkl_scalapack.h>
-#define LA_INT MKL_INT
-#else
-#define LA_INT LA_INT
-#endif
-#include "cblacs.h"
 
 #define BLK_SIZE 32
 #define BLK_PER_PROC 2
 
-LA_INT I_ZERO = 0, I_ONE = 1;
+MKL_INT I_ZERO = 0, I_ONE = 1;
 double D_ONE = 1.0, D_ZERO = 0.0, D_M_ONE = -1.0;
 
-extern LA_INT indxl2g_(LA_INT* INDXGLOB, LA_INT* NB, LA_INT* IPROC, LA_INT* ISRCPROC, LA_INT* NPROCS);
+extern MKL_INT indxl2g_(MKL_INT* INDXGLOB, MKL_INT* NB, MKL_INT* IPROC, MKL_INT* ISRCPROC, MKL_INT* NPROCS);
 
 int main(int argc, char* argv[]) {
     // constant
-    LA_INT N, blk_size = BLK_SIZE, M;
+    MKL_INT N, blk_size = BLK_SIZE, M;
     // global
-    LA_INT nprocs, ctx_sys, glob_nrows, glob_ncols, glob_i, glob_j;
+    MKL_INT nprocs, ctx_sys, glob_nrows, glob_ncols, glob_i, glob_j;
     // local
-    LA_INT  iam, loc_row, loc_col, loc_nrows, loc_ncols, loc_lld, info;
+    MKL_INT  iam, loc_row, loc_col, loc_nrows, loc_ncols, loc_lld, info;
 
-    LA_INT desc_A[9];
+    MKL_INT desc_A[9];
     double *A, *B, *C, *work;
     double norm_A, norm_B, norm_res;
 
@@ -61,17 +55,17 @@ int main(int argc, char* argv[]) {
     srand(time(NULL));
 
     // initialize BLACS & system context
-    Cblacs_pinfo(&iam, &nprocs);
-    Cblacs_get(0, 0, &ctx_sys);
+    blacs_pinfo(&iam, &nprocs);
+    blacs_get(&I_ZERO, &I_ZERO, &ctx_sys);
 
     // create the grid
-    glob_nrows = (LA_INT) sqrt((double) nprocs);
+    glob_nrows = (MKL_INT) sqrt((double) nprocs);
     glob_ncols = nprocs / glob_nrows;
     N = glob_nrows * BLK_SIZE * BLK_PER_PROC;
     M = N * (N-1) * (2 * N - 1) / 6;
 
-    Cblacs_gridinit(&ctx_sys, "R", glob_nrows, glob_ncols);
-    Cblacs_gridinfo(ctx_sys, &glob_nrows, &glob_ncols, &loc_row, &loc_col);
+    blacs_gridinit(&ctx_sys, "R", &glob_nrows, &glob_ncols);
+    blacs_gridinfo(&ctx_sys, &glob_nrows, &glob_ncols, &loc_row, &loc_col);
 
     if(iam == 0)
         printf("%d :: grid is %dx%d, matrix is %dx%d\n", iam, glob_nrows, glob_ncols, N, N);
@@ -93,16 +87,16 @@ int main(int argc, char* argv[]) {
         }
 
     	// fill arrays locally
-        for(LA_INT loc_j=1; loc_j <= loc_ncols; loc_j++) { /* FORTRAN STARTS AT ONE !!!!!!!!! */
+        for(MKL_INT loc_j=1; loc_j <= loc_ncols; loc_j++) { /* FORTRAN STARTS AT ONE !!!!!!!!! */
             // translate local j to global j
             // see https://netlib.org/scalapack/explore-html/d4/deb/indxl2g_8f_source.html
             glob_j = indxl2g_(&loc_j, &blk_size, &loc_col, &I_ZERO, &glob_ncols) - 1;
-            for(LA_INT loc_i=1; loc_i <= loc_nrows; loc_i++) {
+            for(MKL_INT loc_i=1; loc_i <= loc_nrows; loc_i++) {
                 glob_i = indxl2g_(&loc_i, &blk_size, &loc_row, &I_ZERO, &glob_nrows) - 1;
 
                 // set A[i,j]
                 A[(loc_j - 1) * loc_nrows + (loc_i - 1)] = ((N - glob_j - 1) == glob_i ? 1.0 : 0.0) - (double) (2 * glob_i * (N - glob_j - 1)) / ((double) M);
-                B[(loc_j - 1) * loc_nrows + (loc_i - 1)] = ((double) rand()) / INT32_MAX;
+                B[(loc_j - 1) * loc_nrows + (loc_i - 1)] = ((double) rand()) / INT_MAX;
     		}
     	}
 
@@ -118,14 +112,14 @@ int main(int argc, char* argv[]) {
 
         // compute C = A * B
         // see https://www.ibm.com/docs/en/pessl/5.5?topic=lps-pdgemm-pzgemm-matrix-matrix-product-general-matrix-its-transpose-its-conjugate-transpose
-        pdgemm_("N", "N", &N, &N, &N,
+        pdgemm("N", "N", &N, &N, &N,
                 &D_ONE, A, &I_ONE, &I_ONE, desc_A,
                 B, &I_ONE, &I_ONE, desc_A,
                 &D_ZERO, C, &I_ONE, &I_ONE, desc_A
         );
 
         // compute B = tr(A) * C - B
-        pdgemm_("T", "N", &N, &N, &N,
+        pdgemm("T", "N", &N, &N, &N,
                 &D_ONE, A, &I_ONE, &I_ONE, desc_A,
                 C, &I_ONE, &I_ONE, desc_A, &D_M_ONE,
                 B, &I_ONE, &I_ONE, desc_A
@@ -148,6 +142,6 @@ int main(int argc, char* argv[]) {
         printf("%d :: i'm out!\n", iam);
 
     // finalize BLACS
-    Cblacs_exit(0);
+    blacs_exit(&I_ZERO);
     return EXIT_SUCCESS;
 }
