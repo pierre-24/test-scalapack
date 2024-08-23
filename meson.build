@@ -73,3 +73,31 @@ exe_layout = executable(
     install: true,
     c_args : build_args,
 )
+
+tests_to_run = [
+    'hello',
+    'pdgemm',
+    'pdsyev'
+]
+
+mpiexec = find_program('mpiexec', required : true)
+
+foreach f: tests_to_run
+    src_file = files(f +  '.c')
+
+    test_exe = executable(
+        'test_' + f,
+        sources: src_file,
+        dependencies: project_dep,
+        install: false,
+        build_by_default: false,
+        c_args : build_args,
+    )
+
+    test(
+        'test_' + f,
+        test_exe,
+        suite: 'test',
+        is_parallel : false
+    )
+endforeach
