@@ -92,8 +92,8 @@ int main(int argc, char* argv[]) {
         }
 
         // create descriptor for A, X, and r
-        descinit_(desc_A, &N, &N, &blk_size, &blk_size, &I_ZERO, &I_ZERO, &ctx_sys, &loc_lld, &info);
-        descinit_(desc_r, &N, &I_ONE, &blk_size, &blk_size, &I_ZERO, &I_ZERO, &ctx_sys, &loc_lld, &info);
+        descinit_(desc_A, &N, &N, &blk_size, &blk_size, &I_ZERO, &I_ZERO, &ctx_sys, &N, &info);
+        descinit_(desc_r, &N, &I_ONE, &blk_size, &blk_size, &I_ZERO, &I_ZERO, &ctx_sys, &N, &info);
 
         // request lwork
         // the (convoluted) formula is at https://www.ibm.com/docs/en/pessl/5.3.0?topic=easva-pdsyev-pzheev-all-eigenvalues-optionally-eigenvectors-real-symmetric-complex-hermitian-matrix
