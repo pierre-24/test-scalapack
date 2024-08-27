@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
 
     	// create descriptor for A, B and C
         // note: no need to use different descriptor if matrices share the same size and are distributed similarly
-    	descinit_(desc_A, &N, &N, &blk_size, &blk_size, &I_ZERO, &I_ZERO, &ctx_sys, &N, &info);
+    	descinit_(desc_A, &N, &N, &blk_size, &blk_size, &I_ZERO, &I_ZERO, &ctx_sys, &loc_lld, &info);
 
         // compute norm of A and B
         // see https://www.ibm.com/docs/en/pessl/5.5?topic=subroutines-pdlange-pzlange-general-matrix-norm

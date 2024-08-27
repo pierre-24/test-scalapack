@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
         }
 
         // create descriptor for A
-        descinit_(desc_A, &A_nrows, &A_ncols, &blk_size, &blk_size, &I_ZERO, &I_ZERO, &ctx_all, &A_nrows, &info);
+        descinit_(desc_A, &A_nrows, &A_ncols, &blk_size, &blk_size, &I_ZERO, &I_ZERO, &ctx_all, &loc_lld, &info);
 
         // send A to process #0, for the fun of it
         desc_dest[1] = -1;
